@@ -76,7 +76,7 @@ deploy-blue-green:
         exit 1
       fi
 
-    # ВАЖНО: File variable → просто копируем файл
+    # ⬇️ ВАЖНО: File variable → просто копируем файл
     - cp "$SERVER_SSH_KEY" ~/.ssh/id_ed25519
     - chmod 600 ~/.ssh/id_ed25519
 
