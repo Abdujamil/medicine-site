@@ -73,21 +73,6 @@ export const HeroSection = ({ onTubeClick, onScrollToNext }: HeroSectionProps) =
         // }}
         >
           <TestTubeScene tubes={testTubesConfig} onTubeClick={handleTubeClick} />
-
-          {/* Labels - positioned according to Figma */}
-          {/* <div className="absolute top-0 left-[30px] pointer-events-none z-10">
-            <p className="text-[16px] font-light leading-[1.3] text-[#1F1F1F] whitespace-pre-line">
-              Пробирка вакуумная{'\n'}с гепарином
-            </p>
-            <div className="mt-[7px] h-[3px] w-[160px] bg-[#0A4E8D]" />
-          </div>
-          
-          <div className="absolute bottom-[120px] right-[30px] pointer-events-none z-10">
-            <p className="text-[16px] font-light leading-[1.5] text-[#1F1F1F]">
-              Пробирка с цитратом натрия 3,2%
-            </p>
-            <div className="mt-[7px] h-[3px] w-[160px] bg-[#0A4E8D]" />
-          </div> */}
         </div>
       </div>
     </section>
