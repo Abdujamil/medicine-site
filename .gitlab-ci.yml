@@ -1,0 +1,85 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  IMAGE_REPO: "$CI_REGISTRY_IMAGE"
+  CACHE_IMAGE: "$CI_REGISTRY_IMAGE:cache"
+
+  DOCKERFILE_DIR: "."
+  DOCKERFILE_NAME: "Dockerfile"
+
+  IMAGE_SHA_TAG: "${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+
+# -------------------- BUILD --------------------
+
+build-image:
+  stage: build
+  tags:
+    - sector-buildkit-rootless
+  image:
+    name: moby/buildkit:v0.26.2-rootless
+    entrypoint: [""]
+  variables:
+    BUILDKITD_FLAGS: --oci-worker-no-process-sandbox
+  before_script:
+    - mkdir -p ~/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > ~/.docker/config.json
+  script:
+    - |
+      echo "Project: $CI_PROJECT_PATH"
+      echo "Registry image: $IMAGE_REPO"
+      echo "Commit: $CI_COMMIT_SHA"
+      echo "Branch: $CI_COMMIT_REF_NAME"
+
+      buildctl-daemonless.sh build \
+        --frontend dockerfile.v0 \
+        --local context=. \
+        --local dockerfile="$DOCKERFILE_DIR" \
+        --opt filename="$DOCKERFILE_NAME" \
+        --export-cache type=registry,ref="$CACHE_IMAGE",mode=max \
+        --import-cache type=registry,ref="$CACHE_IMAGE" \
+        --output type=image,name="$IMAGE_REPO",push=true \
+        --output type=image,name="$IMAGE_REPO:${IMAGE_SHA_TAG}",push=true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: on_success
+    - when: manual
+
+# -------------------- DEPLOY --------------------
+deploy-blue-green:
+  stage: deploy
+  tags:
+    - sector-buildkit-rootless
+  image: alpine:3.20
+  needs: ["build-image"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: on_success
+
+  before_script:
+    - apk add --no-cache openssh-client
+
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+
+    # проверки
+    - |
+      if [ -z "$SERVER_HOST" ] || [ -z "$SERVER_USER" ]; then
+        echo "SERVER_HOST and SERVER_USER are required"
+        exit 1
+      fi
+
+      if [ -z "$SERVER_SSH_KEY" ]; then
+        echo "SERVER_SSH_KEY is required"
+        exit 1
+      fi
+
+    # ⬇️ ВАЖНО: File variable → просто копируем файл
+    - cp "$SERVER_SSH_KEY" ~/.ssh/id_ed25519
+    - chmod 600 ~/.ssh/id_ed25519
+
+    - ssh-keyscan -p "${SERVER_PORT:-22}" "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+  script:
+    - ssh -p "${SERVER_PORT:-22}" "$SERVER_USER@$SERVER_HOST" "/srv/medicine/switch-slots.sh"
